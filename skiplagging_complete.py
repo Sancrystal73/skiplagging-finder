@@ -20,7 +20,7 @@ from flask import Flask, render_template_string, request, jsonify
 # 根据你的代理软件修改：
 # Clash: http://127.0.0.1:7890
 # v2rayN: socks5://127.0.0.1:10808
-PROXY = "http://127.0.0.1:7890"
+PROXY = "http://127.0.0.1:7897"
 os.environ['HTTP_PROXY'] = PROXY
 os.environ['HTTPS_PROXY'] = PROXY
 print(f"使用代理: {PROXY}")
