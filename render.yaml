@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: skiplagging-finder
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+    envVars:
+      - key: AIRLABS_API_KEY
+        value: 870c8003-7051-4496-990b-01b0eeec5f5f
