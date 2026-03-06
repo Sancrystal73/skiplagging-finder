@@ -1,9 +1,7 @@
-# app.py - Render 部署版本（带 Google Flights 实时查询）
+# app.py - Render 部署版本（带 FlightAPI 真实价格）
 import os
-import re
-import time
-import random
 import requests
+import json
 from flask import Flask, render_template_string, request, jsonify
 from datetime import datetime
 
@@ -11,6 +9,7 @@ app = Flask(__name__)
 
 # API Keys
 AIRLABS_KEY = os.getenv('AIRLABS_API_KEY', '870c8003-7051-4496-990b-01b0eeec5f5f')
+FLIGHTAPI_KEY = os.getenv('FLIGHTAPI_KEY', '')  # 从环境变量读取
 
 def get_airlabs_routes(origin, dest):
     """从 AirLabs 获取真实航线"""
@@ -23,186 +22,129 @@ def get_airlabs_routes(origin, dest):
         print(f"AirLabs 错误: {e}")
         return []
 
-def get_google_flights_price(origin, dest, date):
+def get_flightapi_price(origin, dest, date):
     """
-    从 Google Flights 获取实时价格
-    只在用户查询时调用，避免频繁请求
+    从 FlightAPI.io 获取真实价格
+    URL格式: /onewaytrip/{api_key}/{from}/{to}/{date}/{adults}/{children}/{infants}
     """
-    # 添加随机延迟，避免被封
-    delay = random.uniform(1, 3)
-    time.sleep(delay)
+    if not FLIGHTAPI_KEY:
+        return None
     
-    # Google Flights URL
-    url = f"https://www.google.com/travel/flights/search?tfs=CBwQ{origin}.{dest}.{date}"
+    # 转换日期格式 yyyy-mm-dd 为 yyyymmdd
+    date_clean = date.replace('-', '')
     
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'DNT': '1',
-        'Connection': 'keep-alive',
-    }
+    url = f"https://api.flightapi.io/onewaytrip/{FLIGHTAPI_KEY}/{origin}/{dest}/{date_clean}/1/0/0"
     
     try:
-        print(f"查询 Google Flights: {origin} -> {dest} ({date})")
-        resp = requests.get(url, headers=headers, timeout=20, allow_redirects=True)
+        print(f"查询 FlightAPI: {origin} -> {dest} ({date})")
+        resp = requests.get(url, timeout=15)
         
-        if resp.status_code != 200:
-            print(f"Google Flights 返回状态码: {resp.status_code}")
-            return None
-        
-        # 从 HTML 中提取价格
-        prices = []
-        
-        # 查找价格模式 $XXX 或 $X,XXX
-        price_patterns = [
-            r'\$([\d,]+)',  # $123 或 $1,234
-            r'price[^\d]*([\d,]+)',  # price: 123
-            r'([\d,]+)\s*USD',  # 123 USD
-        ]
-        
-        for pattern in price_patterns:
-            matches = re.findall(pattern, resp.text)
-            for m in matches:
-                try:
-                    price_str = m.replace(',', '')
-                    price = float(price_str)
-                    # 过滤合理价格范围
-                    if 50 < price < 5000:
-                        prices.append(price)
-                except:
-                    continue
-        
-        if prices:
-            # 返回最低价格
-            min_price = min(prices)
-            print(f"✅ 找到价格: ${min_price}")
-            return round(min_price, 2)
+        if resp.status_code == 200:
+            data = resp.json()
+            if isinstance(data, list) and len(data) > 0:
+                # 返回最便宜的航班
+                cheapest = min(data, key=lambda x: x.get('price', float('inf')))
+                return {
+                    'price': cheapest.get('price'),
+                    'airline': cheapest.get('airline'),
+                    'flight_number': cheapest.get('flightNumber'),
+                    'departure': cheapest.get('departureTime'),
+                    'arrival': cheapest.get('arrivalTime'),
+                }
         else:
-            print("⚠️ 未找到价格")
-            return None
+            print(f"FlightAPI 错误: {resp.status_code}")
             
     except Exception as e:
-        print(f"✗ Google Flights 错误: {e}")
-        return None
-
-def estimate_price(origin, dest, duration=300):
-    """估算价格（作为后备）"""
-    # 基于距离和市场的简单估算
-    base = duration * random.uniform(0.3, 0.8)
+        print(f"FlightAPI 请求失败: {e}")
     
-    # 长途国际航班更贵
-    if origin in ['JFK', 'LAX', 'SFO'] and dest in ['PEK', 'PVG', 'HKG', 'YYZ', 'LHR']:
-        base *= 2.5
-    elif origin in ['PEK', 'PVG'] and dest in ['JFK', 'LAX', 'SFO', 'YYZ']:
-        base *= 2.5
-    
-    return round(max(base, 150), 2)
+    return None
 
-def find_skiplagging_with_google(origin, dest, date):
+def find_skiplagging(origin, dest, date):
     """
     查找 skiplagging 机会
-    策略：
-    1. 先查 Google Flights 直飞价格
-    2. 查几个可能的中转路线
-    3. 对比找出节省最多的
+    1. AirLabs 获取航线信息
+    2. FlightAPI 获取真实价格
+    3. 查找中转路线
     """
-    print(f"\n{'='*60}")
-    print(f"搜索: {origin} -> {dest} ({date})")
-    print(f"{'='*60}\n")
+    print(f"\n搜索: {origin} -> {dest} ({date})")
     
-    # 1. 获取直飞价格（Google Flights）
-    direct_price = get_google_flights_price(origin, dest, date)
+    # 1. 获取直飞航线和价格
+    direct_route = None
+    direct_price = None
     
-    # 获取航线信息（AirLabs）
-    routes = get_airlabs_routes(origin, dest)
+    # 先尝试 FlightAPI 真实价格
+    flightapi_data = get_flightapi_price(origin, dest, date)
     
-    if direct_price:
-        print(f"✅ Google Flights 直飞价格: ${direct_price}")
-        price_source = 'Google Flights'
-    else:
-        # 用估算
-        direct_price = estimate_price(origin, dest)
-        print(f"⚠️ 估算直飞价格: ${direct_price}")
-        price_source = '估算'
-    
-    if routes:
-        route = routes[0]
-        direct = {
+    if flightapi_data:
+        direct_price = flightapi_data['price']
+        direct_route = {
             'origin': origin,
             'destination': dest,
             'price': direct_price,
-            'airline': route.get('airline_iata', 'Unknown'),
-            'flight_number': route.get('flight_iata', 'XX123'),
-            'departure': route.get('dep_time', '08:00'),
-            'arrival': route.get('arr_time', '11:00'),
-            'data_source': price_source
+            'airline': flightapi_data['airline'],
+            'flight_number': flightapi_data['flight_number'],
+            'departure': flightapi_data['departure'],
+            'arrival': flightapi_data['arrival'],
+            'data_source': 'FlightAPI'
         }
+        print(f"✅ FlightAPI 直飞价格: ${direct_price}")
     else:
-        direct = {
-            'origin': origin,
-            'destination': dest,
-            'price': direct_price,
-            'airline': 'Unknown',
-            'flight_number': 'XX123',
-            'departure': '08:00',
-            'arrival': '11:00',
-            'data_source': price_source
-        }
+        # Fallback: 用 AirLabs + 估算
+        routes = get_airlabs_routes(origin, dest)
+        if routes:
+            route = routes[0]
+            # 估算价格
+            duration = route.get('duration', 300)
+            direct_price = max(duration * 0.5, 150)  # 简单估算
+            direct_route = {
+                'origin': origin,
+                'destination': dest,
+                'price': round(direct_price, 2),
+                'airline': route.get('airline_iata', 'Unknown'),
+                'flight_number': route.get('flight_iata', 'XX123'),
+                'departure': route.get('dep_time', '08:00'),
+                'arrival': route.get('arr_time', '11:00'),
+                'data_source': 'AirLabs (估算)'
+            }
+            print(f"⚠️ AirLabs 估算价格: ${direct_price}")
     
-    # 2. 查找中转路线（限制数量，避免被封）
-    print(f"\n🔎 查找中转路线...")
+    if not direct_route:
+        return {'error': '未找到直飞航线', 'direct': None, 'skiplagging': []}
     
-    # 智能选择中转枢纽
-    us_hubs = ['ATL', 'DFW', 'DEN', 'ORD', 'LAX', 'SEA', 'JFK', 'SFO', 'MIA', 'LAS']
-    asia_hubs = ['PEK', 'PVG', 'HKG', 'NRT', 'ICN', 'SIN']
-    europe_hubs = ['LHR', 'CDG', 'FRA', 'AMS']
-    
-    # 根据目的地选择可能的中转点
-    potential_hubs = []
-    if dest in us_hubs:
-        potential_hubs = [h for h in us_hubs if h != dest][:4]
-    elif dest in ['PEK', 'PVG', 'HKG']:
-        potential_hubs = ['NRT', 'ICN', 'SIN', 'BKK']
-    elif dest == 'YYZ':  # 多伦多
-        potential_hubs = ['JFK', 'ORD', 'BOS', 'EWR']
-    else:
-        potential_hubs = us_hubs[:4]
-    
+    # 2. 查找 skiplagging 机会（中转路线）
     skiplag_options = []
     
-    for hub in potential_hubs:
-        # 添加延迟，避免请求过快
-        time.sleep(random.uniform(1, 2))
+    # 常见枢纽机场
+    hubs = ['ATL', 'DFW', 'DEN', 'ORD', 'LAX', 'SEA', 'JFK', 'SFO', 'MIA', 'LAS', 'PHX', 'BOS']
+    
+    for hub in hubs[:5]:  # 限制数量，避免请求过多
+        if hub == dest:
+            continue
         
-        connecting_price = get_google_flights_price(origin, hub, date)
+        # 查询 origin -> hub 的价格
+        connecting = get_flightapi_price(origin, hub, date)
         
-        if connecting_price and connecting_price < direct_price * 0.95:
-            savings = direct_price - connecting_price
+        if connecting and connecting['price'] < direct_route['price'] * 0.95:
+            savings = direct_route['price'] - connecting['price']
             skiplag_options.append({
                 'origin': origin,
                 'destination': hub,
                 'via': dest,
-                'price': connecting_price,
-                'airline': direct['airline'],
-                'flight_number': f'{origin}{hub}1',
-                'departure': '06:00',
-                'arrival': '14:00',
+                'price': connecting['price'],
+                'airline': connecting['airline'],
+                'flight_number': connecting['flight_number'],
+                'departure': connecting['departure'],
+                'arrival': connecting['arrival'],
                 'savings': round(savings, 2),
-                'data_source': 'Google Flights'
+                'data_source': 'FlightAPI'
             })
-            print(f"  ✅ {origin}-{dest}-{hub}: ${connecting_price} (省 ${savings:.0f})")
-        else:
-            print(f"  ❌ {origin}-{dest}-{hub}: 无优惠")
+            print(f"  ✅ Skiplag: {origin}-{dest}-{hub} ${connecting['price']} (省 ${savings:.0f})")
     
-    # 按节省金额排序
-    skiplag_options.sort(key=lambda x: x['savings'], reverse=True)
-    
-    print(f"\n💰 找到 {len(skiplag_options)} 个 Skiplagging 机会")
+    # 按价格排序
+    skiplag_options.sort(key=lambda x: x['price'])
     
     return {
-        'direct': direct,
+        'direct': direct_route,
         'skiplagging': skiplag_options,
         'savings': skiplag_options[0]['savings'] if skiplag_options else 0
     }
@@ -214,7 +156,7 @@ HTML_TEMPLATE = '''
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Skiplagging Finder - Google Flights 实时价格</title>
+    <title>Skiplagging Finder - 真实价格</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -242,37 +184,35 @@ HTML_TEMPLATE = '''
         .tag { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; margin-top: 8px; margin-right: 8px; }
         .tag.direct { background: #e0e7ff; color: #667eea; }
         .tag.skiplagging { background: #d1fae5; color: #059669; }
-        .tag.google { background: #dbeafe; color: #2563eb; }
-        .tag.estimate { background: #fef3c7; color: #d97706; }
+        .tag.flightapi { background: #dbeafe; color: #2563eb; }
+        .tag.airlabs { background: #fef3c7; color: #d97706; }
         .loading { text-align: center; padding: 40px; color: #666; }
         .error { color: #dc2626; padding: 16px; background: #fef2f2; border-radius: 10px; }
-        .warning-box { background: #fff7ed; border: 1px solid #fdba74; border-radius: 10px; padding: 16px; margin-top: 20px; }
-        .warning-box h4 { color: #ea580c; margin-bottom: 8px; }
-        .warning-box ul { color: #9a3412; font-size: 13px; padding-left: 20px; }
+        .source { font-size: 12px; color: #999; margin-top: 8px; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>✈️ Skiplagging Finder</h1>
-        <p class="subtitle">Google Flights 实时价格（查询时才获取）</p>
+        <p class="subtitle">FlightAPI.io 真实价格 + AirLabs 真实航线</p>
         
         <div class="card">
             <form id="searchForm">
                 <div class="form-row">
                     <div class="form-group">
                         <label>出发地</label>
-                        <input type="text" id="origin" placeholder="如: AUS" maxlength="3" required>
+                        <input type="text" id="origin" placeholder="如: JFK" maxlength="3" required>
                     </div>
                     <div class="form-group">
                         <label>目的地</label>
-                        <input type="text" id="destination" placeholder="如: YYZ" maxlength="3" required>
+                        <input type="text" id="destination" placeholder="如: LAX" maxlength="3" required>
                     </div>
                     <div class="form-group">
                         <label>日期</label>
                         <input type="date" id="date" required>
                     </div>
                 </div>
-                <button type="submit" id="searchBtn">🔍 查询实时价格</button>
+                <button type="submit" id="searchBtn">🔍 查询真实价格</button>
             </form>
             <div id="results"></div>
         </div>
@@ -292,8 +232,8 @@ HTML_TEMPLATE = '''
             const btn = document.getElementById('searchBtn');
             
             btn.disabled = true;
-            btn.textContent = '查询中（约20-60秒，查询Google Flights）...';
-            resultsDiv.innerHTML = '<div class="loading">正在查询 Google Flights 实时价格...<br><small>为防止被封IP，每次查询间隔1-3秒</small></div>';
+            btn.textContent = '查询中（约10-30秒）...';
+            resultsDiv.innerHTML = '<div class="loading">正在从 FlightAPI.io 获取真实价格...</div>';
             
             try {
                 const response = await fetch('/search', {
@@ -313,9 +253,9 @@ HTML_TEMPLATE = '''
                 
                 // 直飞
                 if (data.direct) {
-                    const sourceTag = data.direct.data_source === 'Google Flights' ? 
-                        '<span class="tag google">Google Flights 实时价格</span>' : 
-                        '<span class="tag estimate">估算价格</span>';
+                    const sourceTag = data.direct.data_source === 'FlightAPI' ? 
+                        '<span class="tag flightapi">FlightAPI 真实价格</span>' : 
+                        '<span class="tag airlabs">AirLabs 估算</span>';
                     
                     html += `
                         <div class="flight-card">
@@ -325,6 +265,7 @@ HTML_TEMPLATE = '''
                             </div>
                             <div style="color:#666;margin-bottom:4px">${data.direct.origin} → ${data.direct.destination}</div>
                             <div style="color:#999;font-size:14px">${data.direct.departure} - ${data.direct.arrival}</div>
+                            <div class="source">日期: ${date}</div>
                             <span class="tag direct">直飞</span>
                             ${sourceTag}
                         </div>
@@ -337,6 +278,9 @@ HTML_TEMPLATE = '''
                     
                     data.skiplagging.forEach((opt) => {
                         const savings = opt.savings.toFixed(0);
+                        const sourceTag = opt.data_source === 'FlightAPI' ? 
+                            '<span class="tag flightapi">FlightAPI 真实价格</span>' : '';
+                        
                         html += `
                             <div class="flight-card skiplagging">
                                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
@@ -348,15 +292,15 @@ HTML_TEMPLATE = '''
                                 </div>
                                 <div style="color:#999;font-size:14px">${opt.departure} - ${opt.arrival}</div>
                                 <span class="tag skiplagging">在 ${opt.via} 下机</span>
-                                <span class="tag google">Google Flights</span>
+                                ${sourceTag}
                             </div>
                         `;
                     });
                     
                     html += `
-                        <div class="warning-box">
-                            <h4>⚠️ 重要提醒</h4>
-                            <ul>
+                        <div style="background:#fff7ed;border:1px solid #fdba74;border-radius:10px;padding:16px;margin-top:20px">
+                            <h4 style="color:#ea580c;margin-bottom:8px">⚠️ 重要提醒</h4>
+                            <ul style="color:#9a3412;font-size:13px;padding-left:20px">
                                 <li>不要托运行李（会直挂到票面上的终点）</li>
                                 <li>不要买往返票（放弃后半程可能导致返程被取消）</li>
                                 <li>建议用无痕模式购票，不要登录常旅客账号</li>
@@ -379,7 +323,7 @@ HTML_TEMPLATE = '''
                 resultsDiv.innerHTML = `<div class="error">❌ 错误: ${err.message}</div>`;
             } finally {
                 btn.disabled = false;
-                btn.textContent = '🔍 查询实时价格';
+                btn.textContent = '🔍 查询真实价格';
             }
         });
     </script>
@@ -402,7 +346,7 @@ def search():
         return jsonify({'error': '请填写所有字段'}), 400
     
     try:
-        result = find_skiplagging_with_google(origin, destination, date)
+        result = find_skiplagging(origin, destination, date)
         return jsonify(result)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
