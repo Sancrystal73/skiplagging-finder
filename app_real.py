@@ -31,64 +31,91 @@ def search():
     
     print(f"搜索: {origin} -> {destination}, 日期: {date}")
     
-    # 搜索所有航班（直飞 + 转机）
-    all_flights = []
+    # 1. 搜索到目标地的所有航班（直飞+转机）
+    all_flights_to_dest = []
     try:
         flight_data = finder.search_flight_offers(origin, destination, date)
         for f_data in flight_data:
             f = finder.parse_flight(f_data, date)
             if f:
-                all_flights.append(f)
-        # 按价格排序
-        all_flights.sort(key=lambda x: x.price)
+                all_flights_to_dest.append(f)
+        all_flights_to_dest.sort(key=lambda x: x.price)
     except Exception as e:
-        print(f"搜索错误: {e}")
+        print(f"搜索到目的地错误: {e}")
     
     # 分离直飞和转机
-    direct_flights = [f for f in all_flights if f.stops == 0]
-    connecting_flights = [f for f in all_flights if f.stops > 0]
+    direct_flights = [f for f in all_flights_to_dest if f.stops == 0]
+    connecting_to_dest = [f for f in all_flights_to_dest if f.stops > 0]
     
-    print(f"找到 {len(direct_flights)} 个直飞, {len(connecting_flights)} 个转机")
+    print(f"到{destination}: {len(direct_flights)} 直飞, {len(connecting_to_dest)} 转机")
     
-    # 查找 skiplagging 机会
-    # 策略：转机航班的目的地不是用户想要的，但经停点是
+    # 2. 搜索到其他枢纽城市的航班（找 skiplagging 机会）
+    # 这些航班可能经停用户想要的目的地
+    hubs = ["JFK", "LGA", "EWR", "BOS", "PHL", "BWI", "ATL", "ORD", "DFW", "DEN", "LAX", "SEA"]
+    skiplag_candidates = []
+    
+    for hub in hubs:
+        if hub == destination:
+            continue
+        try:
+            print(f"搜索 {origin} -> {hub}...")
+            hub_flights_data = finder.search_flight_offers(origin, hub, date)
+            
+            for f_data in hub_flights_data[:5]:  # 每个hub只看前5个
+                f = finder.parse_flight(f_data, date)
+                if f and f.stops > 0:  # 只关心转机航班
+                    # 检查是否经停用户想要的目的地
+                    if f.via == destination:
+                        skiplag_candidates.append(f)
+                        print(f"  找到候选: {f.flight_number} 经停 {f.via} 到 {f.destination} 价格 ${f.price}")
+        except Exception as e:
+            print(f"搜索{hub}错误: {e}")
+    
+    # 3. 计算 skiplagging 机会
     opportunities = []
     
-    if connecting_flights:
-        # 如果没有直飞，用转机中最便宜的作为基准
+    if skiplag_candidates:
+        # 基准价格：直飞价格 或 到目的地的转机价格
         if direct_flights:
             baseline_price = direct_flights[0].price
+            baseline_flight = direct_flights[0]
+        elif connecting_to_dest:
+            baseline_price = connecting_to_dest[0].price
+            baseline_flight = connecting_to_dest[0]
         else:
             baseline_price = float('inf')
+            baseline_flight = None
         
-        for flight in connecting_flights:
-            # 检查这个转机是否经停用户想要的目的地
-            if flight.via == destination:
-                # 转机价格应该比直飞便宜
-                if flight.price < baseline_price:
-                    savings = baseline_price - flight.price if direct_flights else 0
-                    savings_pct = (savings / baseline_price * 100) if direct_flights and baseline_price > 0 else 0
-                    
-                    opportunities.append({
-                        'flight': flight,
-                        'savings': savings,
-                        'savings_percent': savings_pct,
-                        'final_destination': flight.destination  # 票面上的终点
-                    })
-                    print(f"Skiplag机会: {flight.flight_number} 省 ${savings:.2f}")
+        print(f"基准价格: ${baseline_price}")
+        
+        for flight in skiplag_candidates:
+            # 如果经停航班比直接到目的地便宜
+            if flight.price < baseline_price:
+                savings = baseline_price - flight.price
+                savings_pct = (savings / baseline_price * 100) if baseline_price > 0 else 0
+                
+                opportunities.append({
+                    'flight': flight,
+                    'savings': savings,
+                    'savings_percent': savings_pct,
+                    'final_destination': flight.destination,
+                    'via_airport': destination
+                })
+                print(f"✅ Skiplag机会: {flight.flight_number} 省 ${savings:.2f}")
     
     # 按节省金额排序
     opportunities.sort(key=lambda x: x['savings'], reverse=True)
     
-    # 如果没有直飞但有转机，把转机也显示在直飞列表里（但标记为转机）
-    display_flights = direct_flights if direct_flights else all_flights[:5]
+    # 如果没有直飞但有转机到目的地，显示转机
+    display_flights = direct_flights if direct_flights else connecting_to_dest[:5]
     
     return render_template('results.html',
                          origin=origin,
                          destination=destination,
                          date=date,
                          direct_flights=display_flights[:10],
-                         opportunities=opportunities[:10])
+                         opportunities=opportunities[:10],
+                         has_direct=len(direct_flights) > 0)
 
 @app.route('/api/json/search')
 def search_json():
