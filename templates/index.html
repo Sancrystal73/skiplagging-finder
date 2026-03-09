@@ -4,37 +4,147 @@
     <title>Skiplagging Finder</title>
     <meta charset="utf-8">
     <style>
-        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
-        h1 { color: #333; }
-        form { background: #f5f5f5; padding: 20px; border-radius: 8px; }
-        input { padding: 10px; margin: 5px; font-size: 16px; }
-        button { padding: 10px 20px; background: #007bff; color: white; border: none; cursor: pointer; }
-        button:hover { background: #0056b3; }
-        .result { margin-top: 20px; padding: 15px; background: #e9ecef; border-radius: 5px; }
-        .flight { margin: 10px 0; padding: 10px; background: white; border-left: 3px solid #007bff; }
-        .savings { color: #28a745; font-weight: bold; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Arial, sans-serif; 
+            min-height: 100vh;
+            background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.6)),
+                        url('https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=1920');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: rgba(255,255,255,0.95);
+            padding: 50px;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+        }
+        h1 { 
+            color: #333; 
+            margin-bottom: 10px;
+            font-size: 32px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 16px;
+        }
+        form { 
+            margin-top: 20px;
+        }
+        .input-group {
+            margin: 20px 0;
+            text-align: left;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+        }
+        input { 
+            width: 100%;
+            padding: 15px;
+            font-size: 16px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            transition: border-color 0.3s;
+        }
+        input:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+        .row {
+            display: flex;
+            gap: 15px;
+        }
+        .row .input-group {
+            flex: 1;
+        }
+        button { 
+            width: 100%;
+            padding: 18px;
+            background: linear-gradient(135deg, #007bff, #0056b3);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        button:hover { 
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0,123,255,0.3);
+        }
+        .tips {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            text-align: left;
+        }
+        .tips h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+        .tips ul {
+            margin-left: 20px;
+            color: #666;
+            line-height: 1.8;
+        }
+        .logo {
+            font-size: 60px;
+            margin-bottom: 10px;
+        }
     </style>
 </head>
 <body>
-    <h1>🛫 Skiplagging Finder</h1>
-    <p>使用 Amadeus API 的真实航班数据</p>
-    
-    <form action="/api/search">
-        <div>
-            <input type="text" name="origin" placeholder="出发地 (如: AUS)" required maxlength="3">
-            <input type="text" name="destination" placeholder="目的地 (如: DCA)" required maxlength="3">
-            <input type="date" name="date" required>
-            <button type="submit">搜索</button>
+    <div class="container">
+        <div class="logo">🛫</div>
+        <h1>Skiplagging Finder</h1>
+        <p class="subtitle">使用 Amadeus API 的真实航班数据</p>
+        
+        <form action="/api/search">
+            <div class="row">
+                <div class="input-group">
+                    <label>出发地</label>
+                    <input type="text" name="origin" placeholder="如: AUS" required maxlength="3">
+                </div>
+                <div class="input-group">
+                    <label>目的地</label>
+                    <input type="text" name="destination" placeholder="如: DCA" required maxlength="3">
+                </div>
+            </div>
+            
+            <div class="input-group">
+                <label>出发日期</label>
+                <input type="date" name="date" required value="2026-03-15">
+            </div>
+            
+            <button type="submit">🔍 搜索航班</button>
+        </form>
+        
+        <div class="tips">
+            <h3>💡 机场代码示例</h3>
+            <ul>
+                <li><strong>AUS</strong> - Austin, TX (奥斯汀)</li>
+                <li><strong>DCA</strong> - Washington, DC (华盛顿)</li>
+                <li><strong>LAX</strong> - Los Angeles, CA (洛杉矶)</li>
+                <li><strong>JFK</strong> - New York, NY (纽约肯尼迪)</li>
+                <li><strong>ORD</strong> - Chicago, IL (芝加哥)</li>
+            </ul>
         </div>
-    </form>
-    
-    <div class="tips">
-        <h3>💡 提示</h3>
-        <ul>
-            <li>机场代码: AUS=奥斯汀, DCA=华盛顿, LAX=洛杉矶, JFK=纽约</li>
-            <li>日期格式: 2026-03-15</li>
-            <li>使用真实 Amadeus API 数据</li>
-        </ul>
     </div>
 </body>
 </html>
