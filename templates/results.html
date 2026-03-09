@@ -179,8 +179,10 @@
             <strong>日期:</strong> {{ date }}
         </div>
         
-        {% if direct_flights %}
+        {% if has_direct %}
         <h2>✈️ 直飞航班 ({{ direct_flights|length }}个)</h2>
+        {% elif direct_flights %}
+        <h2>✈️ 转机航班 ({{ direct_flights|length }}个) - 无直飞</h2>
         {% for flight in direct_flights %}
         <div class="flight-card">
             <div class="airline">{{ flight.airline_name }}</div>
