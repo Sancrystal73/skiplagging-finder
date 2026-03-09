@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>搜索结果 - Skiplagging Finder</title>
+    <meta charset="utf-8">
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 900px; 
+            margin: 0 auto; 
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        h1 { color: #333; }
+        h2 { color: #555; border-bottom: 2px solid #007bff; padding-bottom: 10px; }
+        .header { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .search-info {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .flight-card {
+            background: white;
+            margin: 15px 0;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-left: 4px solid #007bff;
+        }
+        .flight-card.skiplag {
+            border-left-color: #28a745;
+            background: linear-gradient(to right, #f8fff8, white);
+        }
+        .airline { font-size: 18px; font-weight: bold; color: #333; }
+        .flight-number { color: #666; font-size: 14px; }
+        .route { 
+            font-size: 20px; 
+            margin: 10px 0;
+            color: #444;
+        }
+        .time { color: #666; font-size: 14px; }
+        .price { 
+            font-size: 28px; 
+            font-weight: bold; 
+            color: #007bff;
+            margin: 10px 0;
+        }
+        .price.skiplag { color: #28a745; }
+        .savings {
+            background: #28a745;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            display: inline-block;
+            margin: 10px 0;
+        }
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            color: #856404;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .no-results {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        .back-btn {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 10px 20px;
+            background: #6c757d;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+        .back-btn:hover { background: #5a6268; }
+        .stops { 
+            display: inline-block;
+            background: #e9ecef;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #666;
+        }
+        .stops.direct { background: #d4edda; color: #155724; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🛫 搜索结果</h1>
+    </div>
+    
+    {% if error %}
+    <div class="error">
+        <h3>❌ {{ error }}</h3>
+        <a href="/" class="back-btn">← 返回搜索</a>
+    </div>
+    {% else %}
+    
+    <div class="search-info">
+        <strong>出发地:</strong> {{ origin }} | 
+        <strong>目的地:</strong> {{ destination }} | 
+        <strong>日期:</strong> {{ date }}
+    </div>
+    
+    {% if direct_flights %}
+    <h2>✈️ 直飞航班</h2>
+    {% for flight in direct_flights %}
+    <div class="flight-card">
+        <div class="airline">{{ flight.airline_name }}</div>
+        <div class="flight-number">{{ flight.flight_number }}</div>
+        <div class="route">{{ flight.origin }} → {{ flight.destination }}</div>
+        <div class="time">
+            起飞: {{ flight.departure_time }} | 
+            到达: {{ flight.arrival_time }} | 
+            时长: {{ flight.duration }}
+        </div>
+        <div class="price">${{ "%.2f"|format(flight.price) }}</div>
+        <span class="stops direct">直飞</span>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="no-results">
+        <h3>未找到直飞航班</h3>
+        <p>请尝试其他日期或机场</p>
+    </div>
+    {% endif %}
+    
+    {% if opportunities %}
+    <h2>💰 Skiplagging 机会</h2>
+    {% for opp in opportunities %}
+    <div class="flight-card skiplag">
+        <div class="airline">{{ opp.flight.airline_name }}</div>
+        <div class="flight-number">{{ opp.flight.flight_number }}</div>
+        <div class="route">
+            {{ opp.flight.origin }} → {{ opp.flight.via }} → {{ opp.final_destination }}
+        </div>
+        <div style="color: #28a745; font-size: 14px;">
+            ✅ 实际使用: {{ opp.flight.origin }} → {{ opp.flight.via }} (在 {{ opp.flight.via }} 下机)
+        </div>
+        <div class="time">
+            起飞: {{ opp.flight.departure_time }} | 
+            到达: {{ opp.flight.arrival_time }}
+        </div>
+        <div class="price skiplag">${{ "%.2f"|format(opp.flight.price) }}</div>
+        <div class="savings">
+            省 ${{ "%.2f"|format(opp.savings) }} ({{ "%.1f"|format(opp.savings_percent) }}%)
+        </div>
+        <span class="stops">1 次经停</span>
+    </div>
+    {% endfor %}
+    {% endif %}
+    
+    <div class="warning">
+        <strong>⚠️ 风险提示:</strong><br>
+        • Skiplagging 违反大多数航空公司条款，可能导致封号、里程清零、拒载<br>
+        • 不要托运行李（行李会直挂到票面上的终点）<br>
+        • 不要买往返票（放弃后半程可能导致返程被取消）<br>
+        • 航班变动时航空公司可能改道
+    </div>
+    
+    <a href="/" class="back-btn">← 重新搜索</a>
+    
+    {% endif %}
+</body>
+</html>
