@@ -2,24 +2,14 @@
 """
 Skiplagging Finder Web App - Real Data Version
 使用 Amadeus API 获取真实航班数据
-
-部署到 Render:
-1. 创建 Render 账号
-2. 新建 Web Service
-3. 选择此 GitHub 仓库
-4. 设置环境变量（可选）
-5. 部署完成
 """
 
 from flask import Flask, render_template, request, jsonify
 import os
-import json
-from datetime import datetime, timedelta
-from skiplagging_real import RealSkiplaggingFinder, Flight, SkiplagOpportunity
+from datetime import datetime
+from skiplagging_real import RealSkiplaggingFinder
 
 app = Flask(__name__)
-
-# 初始化 finder
 finder = RealSkiplaggingFinder()
 
 @app.route('/')
@@ -29,7 +19,68 @@ def index():
 
 @app.route('/api/search')
 def search():
-    """搜索 API"""
+    """搜索 API - 返回 HTML 页面"""
+    origin = request.args.get('origin', '').upper()
+    destination = request.args.get('destination', '').upper()
+    date = request.args.get('date', '')
+    
+    if not origin or not destination or not date:
+        return render_template('results.html', 
+                             error='请填写出发地、目的地和日期',
+                             origin=origin, destination=destination, date=date)
+    
+    print(f"搜索: {origin} -> {destination}, 日期: {date}")
+    
+    # 搜索直飞航班
+    direct_flights = []
+    try:
+        direct_data = finder.search_flight_offers(origin, destination, date)
+        for f_data in direct_data[:10]:  # 最多10个
+            f = finder.parse_flight(f_data, date)
+            if f:
+                direct_flights.append(f)
+        direct_flights.sort(key=lambda x: x.price)
+    except Exception as e:
+        print(f"直飞搜索错误: {e}")
+    
+    # 搜索 skiplagging 机会
+    opportunities = []
+    if direct_flights:
+        cheapest_direct = direct_flights[0]
+        hubs = ["JFK", "LAX", "ORD", "DFW", "DEN", "ATL", "SEA", "SFO", "MIA", "BOS"]
+        
+        for hub in hubs:
+            if hub == destination:
+                continue
+            try:
+                connecting_data = finder.search_flight_offers(origin, hub, date)
+                for f_data in connecting_data[:5]:
+                    flight = finder.parse_flight(f_data, date)
+                    if flight and flight.via == destination:
+                        if flight.price < cheapest_direct.price:
+                            savings = cheapest_direct.price - flight.price
+                            opportunities.append({
+                                'flight': flight,
+                                'savings': savings,
+                                'savings_percent': (savings / cheapest_direct.price) * 100,
+                                'final_destination': hub
+                            })
+            except Exception as e:
+                print(f"转机搜索错误 {hub}: {e}")
+        
+        # 按节省金额排序
+        opportunities.sort(key=lambda x: x['savings'], reverse=True)
+    
+    return render_template('results.html',
+                         origin=origin,
+                         destination=destination,
+                         date=date,
+                         direct_flights=direct_flights[:5],
+                         opportunities=opportunities[:5])
+
+@app.route('/api/json/search')
+def search_json():
+    """搜索 API - 返回 JSON"""
     origin = request.args.get('origin', '').upper()
     destination = request.args.get('destination', '').upper()
     date = request.args.get('date', '')
@@ -37,60 +88,19 @@ def search():
     if not origin or not destination:
         return jsonify({'error': '需要提供 origin 和 destination'}), 400
     
-    # 搜索直飞
-    direct = finder.search_flight_offers(origin, destination, date)
+    direct_data = finder.search_flight_offers(origin, destination, date)
     direct_flights = []
-    for f_data in direct[:5]:  # 最多5个
+    for f_data in direct_data[:5]:
         f = finder.parse_flight(f_data, date)
         if f:
             direct_flights.append(f.to_dict())
     
-    # 搜索 skiplagging
-    opportunities = []
-    hubs = ["JFK", "LAX", "ORD", "DFW", "DEN", "ATL"]
-    for hub in hubs:
-        if hub == destination:
-            continue
-        connecting = finder.search_flight_offers(origin, hub, date)
-        for f_data in connecting:
-            flight = finder.parse_flight(f_data, date)
-            if flight and flight.via == destination:
-                if direct_flights and flight.price < direct_flights[0]['price']:
-                    savings = direct_flights[0]['price'] - flight.price
-                    opportunities.append({
-                        'direct': direct_flights[0],
-                        'skiplag': flight.to_dict(),
-                        'savings': savings,
-                        'savings_percent': (savings / direct_flights[0]['price']) * 100
-                    })
-    
     return jsonify({
         'direct_flights': direct_flights,
-        'opportunities': opportunities[:3]
+        'origin': origin,
+        'destination': destination,
+        'date': date
     })
-
-@app.route('/api/march/<origin>/<destination>')
-def march_prices(origin, destination):
-    """获取整个3月的价格"""
-    origin = origin.upper()
-    destination = destination.upper()
-    
-    dates = finder.get_march_dates(2026)
-    results = []
-    
-    for date in dates[:7]:  # 限制查询数量避免 API 限制
-        direct = finder.search_flight_offers(origin, destination, date)
-        if direct:
-            f = finder.parse_flight(direct[0], date)
-            if f:
-                results.append({
-                    'date': date,
-                    'price': f.price,
-                    'flight_number': f.flight_number,
-                    'airline': f.airline_name
-                })
-    
-    return jsonify(results)
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
