@@ -4,183 +4,255 @@
     <title>搜索结果 - Skiplagging Finder</title>
     <meta charset="utf-8">
     <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
-            font-family: Arial, sans-serif; 
-            max-width: 900px; 
-            margin: 0 auto; 
+            font-family: 'Segoe UI', Arial, sans-serif; 
+            min-height: 100vh;
+            background: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)),
+                        url('https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=1920');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
             padding: 20px;
-            background: #f8f9fa;
+        }
+        .container {
+            max-width: 900px; 
+            margin: 0 auto;
         }
         h1 { color: #333; }
-        h2 { color: #555; border-bottom: 2px solid #007bff; padding-bottom: 10px; }
+        h2 { 
+            color: white; 
+            border-bottom: 3px solid #007bff; 
+            padding-bottom: 10px;
+            margin: 30px 0 20px 0;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
         .header { 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, rgba(102,126,234,0.9) 0%, rgba(118,75,162,0.9) 100%);
             color: white;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 20px;
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
         }
         .search-info {
-            background: white;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .flight-card {
-            background: white;
-            margin: 15px 0;
+            background: rgba(255,255,255,0.95);
             padding: 20px;
             border-radius: 10px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            border-left: 4px solid #007bff;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            text-align: center;
+            font-size: 18px;
+        }
+        .flight-card {
+            background: rgba(255,255,255,0.95);
+            margin: 20px 0;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+            border-left: 5px solid #007bff;
+            transition: transform 0.2s;
+        }
+        .flight-card:hover {
+            transform: translateY(-3px);
         }
         .flight-card.skiplag {
             border-left-color: #28a745;
-            background: linear-gradient(to right, #f8fff8, white);
+            background: linear-gradient(to right, rgba(248,255,248,0.95), rgba(255,255,255,0.95));
         }
-        .airline { font-size: 18px; font-weight: bold; color: #333; }
-        .flight-number { color: #666; font-size: 14px; }
+        .airline { font-size: 22px; font-weight: bold; color: #333; }
+        .flight-number { color: #666; font-size: 16px; margin-top: 5px; }
         .route { 
-            font-size: 20px; 
-            margin: 10px 0;
-            color: #444;
+            font-size: 26px; 
+            margin: 15px 0;
+            color: #222;
+            font-weight: 600;
         }
-        .time { color: #666; font-size: 14px; }
+        .time { color: #555; font-size: 15px; line-height: 1.8; }
         .price { 
-            font-size: 28px; 
+            font-size: 36px; 
             font-weight: bold; 
             color: #007bff;
-            margin: 10px 0;
+            margin: 15px 0;
         }
         .price.skiplag { color: #28a745; }
         .savings {
-            background: #28a745;
+            background: linear-gradient(135deg, #28a745, #20c997);
             color: white;
-            padding: 8px 15px;
-            border-radius: 20px;
+            padding: 12px 20px;
+            border-radius: 25px;
             font-weight: bold;
             display: inline-block;
-            margin: 10px 0;
+            margin: 15px 0;
+            font-size: 18px;
+            box-shadow: 0 4px 15px rgba(40,167,69,0.3);
         }
         .warning {
-            background: #fff3cd;
-            border: 1px solid #ffc107;
+            background: rgba(255,243,205,0.95);
+            border: 2px solid #ffc107;
             color: #856404;
-            padding: 15px;
-            border-radius: 8px;
-            margin: 20px 0;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 30px 0;
+            font-size: 15px;
+            line-height: 1.8;
         }
         .error {
-            background: #f8d7da;
-            border: 1px solid #f5c6cb;
+            background: rgba(248,215,218,0.95);
+            border: 2px solid #f5c6cb;
             color: #721c24;
-            padding: 20px;
-            border-radius: 8px;
+            padding: 30px;
+            border-radius: 10px;
             text-align: center;
         }
         .no-results {
             text-align: center;
-            padding: 40px;
-            color: #666;
+            padding: 60px;
+            color: white;
+            background: rgba(0,0,0,0.4);
+            border-radius: 15px;
+            margin: 20px 0;
         }
         .back-btn {
             display: inline-block;
-            margin-top: 20px;
-            padding: 10px 20px;
-            background: #6c757d;
+            margin-top: 30px;
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #6c757d, #495057);
             color: white;
             text-decoration: none;
-            border-radius: 5px;
+            border-radius: 30px;
+            font-size: 16px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            transition: all 0.3s;
         }
-        .back-btn:hover { background: #5a6268; }
+        .back-btn:hover { 
+            background: linear-gradient(135deg, #495057, #343a40);
+            transform: translateY(-2px);
+        }
         .stops { 
             display: inline-block;
             background: #e9ecef;
-            padding: 4px 10px;
-            border-radius: 4px;
-            font-size: 12px;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 14px;
             color: #666;
+            font-weight: 600;
         }
-        .stops.direct { background: #d4edda; color: #155724; }
+        .stops.direct { 
+            background: #d4edda; 
+            color: #155724; 
+        }
+        .stops.connecting {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 13px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .badge-direct { background: #28a745; color: white; }
+        .badge-connecting { background: #ffc107; color: #333; }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>🛫 搜索结果</h1>
-    </div>
-    
-    {% if error %}
-    <div class="error">
-        <h3>❌ {{ error }}</h3>
-        <a href="/" class="back-btn">← 返回搜索</a>
-    </div>
-    {% else %}
-    
-    <div class="search-info">
-        <strong>出发地:</strong> {{ origin }} | 
-        <strong>目的地:</strong> {{ destination }} | 
-        <strong>日期:</strong> {{ date }}
-    </div>
-    
-    {% if direct_flights %}
-    <h2>✈️ 直飞航班</h2>
-    {% for flight in direct_flights %}
-    <div class="flight-card">
-        <div class="airline">{{ flight.airline_name }}</div>
-        <div class="flight-number">{{ flight.flight_number }}</div>
-        <div class="route">{{ flight.origin }} → {{ flight.destination }}</div>
-        <div class="time">
-            起飞: {{ flight.departure_time }} | 
-            到达: {{ flight.arrival_time }} | 
-            时长: {{ flight.duration }}
+    <div class="container">
+        <div class="header">
+            <h1>🛫 航班搜索结果</h1>
+            <p style="margin-top: 10px; opacity: 0.9;">使用 Amadeus 真实数据</p>
         </div>
-        <div class="price">${{ "%.2f"|format(flight.price) }}</div>
-        <span class="stops direct">直飞</span>
-    </div>
-    {% endfor %}
-    {% else %}
-    <div class="no-results">
-        <h3>未找到直飞航班</h3>
-        <p>请尝试其他日期或机场</p>
-    </div>
-    {% endif %}
-    
-    {% if opportunities %}
-    <h2>💰 Skiplagging 机会</h2>
-    {% for opp in opportunities %}
-    <div class="flight-card skiplag">
-        <div class="airline">{{ opp.flight.airline_name }}</div>
-        <div class="flight-number">{{ opp.flight.flight_number }}</div>
-        <div class="route">
-            {{ opp.flight.origin }} → {{ opp.flight.via }} → {{ opp.final_destination }}
+        
+        {% if error %}
+        <div class="error">
+            <h3>❌ {{ error }}</h3>
+            <a href="/" class="back-btn">← 返回搜索</a>
         </div>
-        <div style="color: #28a745; font-size: 14px;">
-            ✅ 实际使用: {{ opp.flight.origin }} → {{ opp.flight.via }} (在 {{ opp.flight.via }} 下机)
+        {% else %}
+        
+        <div class="search-info">
+            <strong>出发地:</strong> {{ origin }} | 
+            <strong>目的地:</strong> {{ destination }} | 
+            <strong>日期:</strong> {{ date }}
         </div>
-        <div class="time">
-            起飞: {{ opp.flight.departure_time }} | 
-            到达: {{ opp.flight.arrival_time }}
+        
+        {% if direct_flights %}
+        <h2>✈️ 直飞航班 ({{ direct_flights|length }}个)</h2>
+        {% for flight in direct_flights %}
+        <div class="flight-card">
+            <div class="airline">{{ flight.airline_name }}</div>
+            <div class="flight-number">{{ flight.flight_number }}</div>
+            <div class="route">{{ flight.origin }} → {{ flight.destination }}</div>
+            <div class="time">
+                起飞: {{ flight.departure_time }}<br>
+                到达: {{ flight.arrival_time }}<br>
+                时长: {{ flight.duration }}
+            </div>
+            <div class="price">${{ "%.2f"|format(flight.price) }}</div>
+            {% if flight.stops == 0 %}
+                <span class="stops direct">✓ 直飞</span>
+                <span class="badge badge-direct">DIRECT</span>
+            {% else %}
+                <span class="stops connecting">⚠ 经停 {{ flight.stops }} 次</span>
+                {% if flight.via %}
+                    <span style="color: #856404; margin-left: 10px;">经 {{ flight.via }}</span>
+                {% endif %}
+                <span class="badge badge-connecting">CONNECTING</span>
+            {% endif %}
         </div>
-        <div class="price skiplag">${{ "%.2f"|format(opp.flight.price) }}</div>
-        <div class="savings">
-            省 ${{ "%.2f"|format(opp.savings) }} ({{ "%.1f"|format(opp.savings_percent) }}%)
+        {% endfor %}
+        {% else %}
+        <div class="no-results">
+            <h3>未找到直飞航班</h3>
+            <p>请尝试其他日期或机场</p>
         </div>
-        <span class="stops">1 次经停</span>
+        {% endif %}
+        
+        {% if opportunities %}
+        <h2>💰 Skiplagging 机会 ({{ opportunities|length }}个)</h2>
+        {% for opp in opportunities %}
+        <div class="flight-card skiplag">
+            <div class="airline">{{ opp.flight.airline_name }}</div>
+            <div class="flight-number">{{ opp.flight.flight_number }}</div>
+            <div class="route">
+                {{ opp.flight.origin }} → {{ opp.flight.via }} → {{ opp.final_destination }}
+            </div>
+            <div style="color: #28a745; font-size: 16px; margin: 10px 0;">
+                ✅ 实际使用: {{ opp.flight.origin }} → {{ opp.flight.via }} 
+                <strong>(在 {{ opp.flight.via }} 下机)</strong>
+            </div>
+            <div class="time">
+                起飞: {{ opp.flight.departure_time }} | 
+                到达: {{ opp.flight.arrival_time }}
+            </div>
+            <div class="price skiplag">${{ "%.2f"|format(opp.flight.price) }}</div>
+            <div class="savings">
+                💵 省 ${{ "%.2f"|format(opp.savings) }} ({{ "%.1f"|format(opp.savings_percent) }}%)
+            </div>
+            <span class="stops connecting">经停 1 次</span>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="no-results" style="background: rgba(108,117,125,0.4);">
+            <h3>💡 未找到 Skiplagging 机会</h3>
+            <p>该航线暂时没有转机比直飞便宜的选项</p>
+        </div>
+        {% endif %}
+        
+        <div class="warning">
+            <strong>⚠️ 风险提示:</strong><br>
+            • Skiplagging 违反大多数航空公司条款，可能导致封号、里程清零、拒载<br>
+            • 不要托运行李（行李会直挂到票面上的终点）<br>
+            • 不要买往返票（放弃后半程可能导致返程被取消）<br>
+            • 航班变动时航空公司可能改道
+        </div>
+        
+        <a href="/" class="back-btn">← 重新搜索</a>
+        
+        {% endif %}
     </div>
-    {% endfor %}
-    {% endif %}
-    
-    <div class="warning">
-        <strong>⚠️ 风险提示:</strong><br>
-        • Skiplagging 违反大多数航空公司条款，可能导致封号、里程清零、拒载<br>
-        • 不要托运行李（行李会直挂到票面上的终点）<br>
-        • 不要买往返票（放弃后半程可能导致返程被取消）<br>
-        • 航班变动时航空公司可能改道
-    </div>
-    
-    <a href="/" class="back-btn">← 重新搜索</a>
-    
-    {% endif %}
 </body>
 </html>
