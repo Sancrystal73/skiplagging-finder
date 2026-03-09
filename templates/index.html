@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Skiplagging Finder</title>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        h1 { color: #333; }
+        form { background: #f5f5f5; padding: 20px; border-radius: 8px; }
+        input { padding: 10px; margin: 5px; font-size: 16px; }
+        button { padding: 10px 20px; background: #007bff; color: white; border: none; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .result { margin-top: 20px; padding: 15px; background: #e9ecef; border-radius: 5px; }
+        .flight { margin: 10px 0; padding: 10px; background: white; border-left: 3px solid #007bff; }
+        .savings { color: #28a745; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>🛫 Skiplagging Finder</h1>
+    <p>使用 Amadeus API 的真实航班数据</p>
+    
+    <form action="/api/search">
+        <div>
+            <input type="text" name="origin" placeholder="出发地 (如: AUS)" required maxlength="3">
+            <input type="text" name="destination" placeholder="目的地 (如: DCA)" required maxlength="3">
+            <input type="date" name="date" required>
+            <button type="submit">搜索</button>
+        </div>
+    </form>
+    
+    <div class="tips">
+        <h3>💡 提示</h3>
+        <ul>
+            <li>机场代码: AUS=奥斯汀, DCA=华盛顿, LAX=洛杉矶, JFK=纽约</li>
+            <li>日期格式: 2026-03-15</li>
+            <li>使用真实 Amadeus API 数据</li>
+        </ul>
+    </div>
+</body>
+</html>
